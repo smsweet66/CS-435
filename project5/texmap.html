@@ -1,0 +1,48 @@
+<html lang="en" title="Sean Sweet CS-435 Project #4">
+<canvas id="gl-canvas" width="1024" height="1024"> </canvas>
+<script id="vertex-shader" type="x-shader/x-vertex">
+	#version 300 es
+
+	layout(location = 0) in vec4 a_position;
+	layout(location = 1) in vec2 a_texCoord;
+
+	uniform mat4 u_model;
+	uniform mat4 u_view;
+	uniform mat4 u_projection;
+
+	out vec2 v_texCoord;
+
+	void main()
+	{
+		v_texCoord = a_texCoord;
+		gl_Position = u_projection * u_view * u_model * a_position;
+	}
+</script>
+
+<script id="fragment-shader" type="x-shader/x-fragment">
+	#version 300 es
+
+	precision mediump float;
+
+	in vec2 v_texCoord;
+
+	uniform sampler2D u_texture;
+
+	out vec4 color;
+
+	void main()
+	{
+		color = texture(u_texture, v_texCoord);
+	}
+</script>
+
+<script type="image/svg+xml" src="grey_square.png"></script>
+<script type="image/svg+xml" src="black_square.jpg"></script>
+<script type="image/svg+xml" src="brick_wall.jpg"></script>
+<script type="image/svg+xml" src="carpet.jpeg"></script>
+<script type="image/svg+xml" src="wood.jpg"></script>
+
+<script type="text/javascript" src="../Common/initShaders.js"></script>
+<script type="text/javascript" src="../Common/MVnew.js"></script>
+<script type="text/javascript" src="texmap.js"></script>
+</html>

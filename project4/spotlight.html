@@ -1,0 +1,67 @@
+<html lang="en" title="Sean Sweet CS-435 Project #4">
+<canvas id="gl-canvas" width="1024" height="1024"> </canvas>
+<table>
+	<tr>
+		<td>
+			<label for="Cutoff Angle">Select Cutoff Angle:</label>
+			<select name="Cutoff Angle" id="Cutoff Angle">
+				<option value="Small">Small</option>
+				<option value="Medium">Medium</option>
+				<option value="Large">Large</option>
+			</select>
+		</td>
+	</tr>
+</table>
+<script id="vertex-shader" type="x-shader/x-vertex">
+	#version 300 es
+
+	layout(location = 0) in vec4 a_position;
+	layout(location = 1) in vec3 a_normal;
+
+	uniform mat4 u_view;
+	uniform mat4 u_projection;
+
+
+	out vec3 normal;
+	out vec3 fragPos;
+
+	void main()
+	{
+		gl_Position = u_projection * u_view * a_position;
+		fragPos = a_position.xyz;
+		normal = a_normal;
+	}
+</script>
+
+<script id="fragment-shader" type="x-shader/x-fragment">
+	#version 300 es
+
+	precision mediump float;
+
+	uniform vec3 u_spotlightLoc;
+	uniform float u_cutoffAngle;
+
+	in vec3 normal;
+	in vec3 fragPos;
+
+	out vec4 color;
+
+	void main()
+	{
+		vec3 lightPos = vec3(0.0, 15.0, 0.0);
+		vec3 lightDir = normalize(lightPos - u_spotlightLoc);
+		vec3 fragLightDir = normalize(lightPos - fragPos);
+		vec3 diffuse = vec3(0.0);
+
+		if(acos(dot(lightDir, fragLightDir)) < radians(u_cutoffAngle))
+			diffuse = max(dot(normal, fragLightDir), 0.0) * vec3(1.0);
+
+		vec3 ambient = vec3(.2);
+
+		color = vec4((diffuse + ambient) * vec3(0.6), 1.0);
+	}
+</script>
+<script type="text/javascript" src="../Common/initShaders.js"></script>
+<script type="text/javascript" src="../Common/MVnew.js"></script>
+<script type="text/javascript" src="spotlight.js"></script>
+</html>

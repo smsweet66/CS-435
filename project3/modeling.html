@@ -1,0 +1,59 @@
+<html lang="en" title="Sean Sweet CS-435 Project #3">
+<canvas id="gl-canvas" width="1024" height="1024"> </canvas>
+<table>
+	<tr>
+		<td>
+			<label for="Fuel Type">Select Fuel Type:</label>
+			<select name="Fuel Type" id="Fuel Type">
+				<option value="Regular">Regular</option>
+				<option value="Plus">Plus</option>
+				<option value="Premium">Premium</option>
+			</select>
+		</td>
+	</tr>
+	<tr>
+		<td>
+			<button type="button" id="up">Up</button>
+			<button type="button" id="down">Down</button>
+		</td>
+	</tr>
+	<tr>
+		<td>
+			<button type="button" id="spin">Start</button>
+		</td>
+	</tr>
+</table>
+<script id="vertex-shader" type="x-shader/x-vertex">
+	#version 300 es
+
+	layout(location = 0) in vec4 a_position;
+
+	uniform mat4 u_model;
+	uniform mat4 u_view;
+	uniform mat4 u_projection;
+
+	void main()
+	{
+		gl_Position = u_projection * u_view * u_model * a_position;
+	}
+</script>
+
+<script id="fragment-shader" type="x-shader/x-fragment">
+	#version 300 es
+
+	precision mediump float;
+
+	uniform vec4 u_color;
+
+	out vec4 color;
+
+	void main()
+	{
+		color = u_color;
+	}
+</script>
+
+<script type="text/javascript" src="../Common/initShaders.js"></script>
+<script type="text/javascript" src="../Common/MVnew.js"></script>
+<script type="text/javascript" src="modeling.js"></script>
+</html>
