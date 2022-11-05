@@ -135,7 +135,6 @@ function drawElement(vertexBuffer, indexBuffer, length, texture, modelMatrix)
 	gl.uniformMatrix4fv(u_projection, false, flatten(projectionMatrix));
 	gl.uniform1i(u_texture, 0);
 
-
 	//set attributes
 	gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 20, 0);
 	gl.vertexAttribPointer(1, 2, gl.FLOAT, false, 20, 12);
