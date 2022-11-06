@@ -29,7 +29,6 @@ window.onload = function init()
 
 	gl.viewport(0, 0, canvas.width, canvas.height);
 	gl.clearColor(0.7, 0.7, 0.7, 1.0);
-	gl.enable(gl.DEPTH_TEST);   //closes surface gets drawn
 	gl.enable(gl.BLEND);
 	gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
@@ -46,13 +45,56 @@ window.onload = function init()
 	//sets texture uniform location
 	u_texture = gl.getUniformLocation(program, "u_texture");
 
-	let frame = new Frame([50, 50], "frame4.png",5, 15, 2.5, 17.5);
+	let frames = [
+		new Frame([112, 212], "frame1.png", 60, 140, 150, 50),
+		new Frame([312, 212], "frame2.png", 50, 150, 175, 25),
+		new Frame([512, 212], "frame3.png", 50, 150, 175, 25),
+		new Frame([712, 212], "frame4.png", 50, 150, 175, 25)
+	]
+
+	let pictures = [
+		new Picture([112, 612], "picture1.jpg"),
+		new Picture([312, 612], "picture2.webp"),
+		new Picture([512, 612], "picture3.jpg"),
+		new Picture([712, 612], "picture4.jpg")
+	]
+
+	let selectedFrame = 0;
+	let selectedPicture = 0;
+
 	drawLoop();
+
+	//tells what should happen when the mouse is pressed down
+	gl.canvas.addEventListener('mousedown', (e) => {
+		//transforms raw mouse location to screen coordinates
+		const rect = canvas.getBoundingClientRect();
+		let mouseLocation = [0, 0];
+		mouseLocation[0] = e.clientX - rect.left;
+		mouseLocation[1] = rect.bottom - e.clientY;
+
+		for(let i=0; i<frames.length; i++)
+		{
+			if(frames[i].isIn(mouseLocation))
+				selectedFrame = i;
+		}
+
+		for(let i=0; i<pictures.length; i++)
+		{
+			if(pictures[i].isIn(mouseLocation))
+				selectedPicture = i;
+		}
+	});
 
 	function drawLoop()
 	{
 		gl.clear(gl.COLOR_BUFFER_BIT);
-		frame.draw();
+		for(let i=0; i<4; i++)
+		{
+			frames[i].draw();
+			pictures[i].draw();
+		}
+
+		frames[selectedFrame].drawWithPicture([412, 412], pictures[selectedPicture].texture);
 		requestAnimationFrame(drawLoop);
 	}
 };
@@ -96,28 +138,17 @@ function generateTexture(image)
 	return texture;
 }
 
-class Picture
+class Object
 {
-	static vertices = new Float32Array([
-		0, 0,   0, 0,
-		200, 0,  1, 0,
-		200, 200, 1, 1,
-		0, 200,  0, 1
-	]);
-
-	static vertexBuffer;
-
+	vertexBuffer;
 	texture;
 	location;
 
-	constructor(location, picture)
+	constructor(location, picture, vertices)
 	{
-		if(!Picture.vertexBuffer)
-		{
-			Picture.vertexBuffer = gl.createBuffer();
-			gl.bindBuffer(gl.ARRAY_BUFFER, Picture.vertexBuffer);
-			gl.bufferData(gl.ARRAY_BUFFER, Picture.vertices, gl.STATIC_DRAW);
-		}
+		this.vertexBuffer = gl.createBuffer();
+		gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexBuffer);
+		gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
 
 		let image = new Image();
 		image.src = picture;
@@ -126,34 +157,52 @@ class Picture
 
 		this.location = location;
 	}
+
+	draw()
+	{ drawElement(this.vertexBuffer, this.texture, translate(this.location[0], this.location[1], 0)); }
 }
 
-class Frame
+class Picture extends Object
 {
-	static frameVertices = new Float32Array([
+	static vertices = new Float32Array([
 		0, 0,   0, 0,
 		200, 0,  1, 0,
 		200, 200, 1, 1,
 		0, 200,  0, 1
 	]);
 
-	static frameVB;
+	constructor(location, picture)
+	{ super(location, picture, Picture.vertices); }
+
+	isIn(location)
+	{
+		for(let i=0; i<4; i++)
+		{
+			let v1 = vec3(Picture.vertices[((i+1)*4)%16] - Picture.vertices[i*4], Picture.vertices[(i+1)*4%16 + 1] - Picture.vertices[i*4 + 1], 0);
+			let v2 = vec3(location[0] - Picture.vertices[(i+1)*4%16] - this.location[0], location[1] - Picture.vertices[(i+1)*4%16 + 1] - this.location[1], 0);
+			if(cross(v1, v2)[2] < 0)
+				return false;
+		}
+
+		return true;
+	}
+}
+
+class Frame extends Object
+{
+	static vertices = new Float32Array([
+		0, 0,   0, 0,
+		200, 0,  1, 0,
+		200, 200, 1, 1,
+		0, 200,  0, 1
+	]);
 
 	pictureVertices;
 	pictureVB;
 
-	static frameTexture;
-	location;
-
 	constructor(location, frame, left, right, top, bottom)
 	{
-		if(!Frame.frameVB)
-		{
-			Frame.frameVB = gl.createBuffer();
-			gl.bindBuffer(gl.ARRAY_BUFFER, Frame.frameVB);
-			gl.bufferData(gl.ARRAY_BUFFER, Frame.frameVertices, gl.STATIC_DRAW);
-		}
-
+		super(location, frame, Frame.vertices);
 		this.pictureVertices = new Float32Array([
 			left, bottom,   0, 0,
 			right, bottom,  1, 0,
@@ -161,20 +210,27 @@ class Frame
 			left, top,      0, 1
 		]);
 
-		let image = new Image();
-		image.src = frame;
-		let self = this;
-		image.onload = function() { self.frameTexture = generateTexture(image); }
-
-		this.location = location;
+		this.pictureVB = gl.createBuffer();
+		gl.bindBuffer(gl.ARRAY_BUFFER, this.pictureVB);
+		gl.bufferData(gl.ARRAY_BUFFER, this.pictureVertices, gl.STATIC_DRAW);
 	}
-
-	draw()
-	{ drawElement(Frame.frameVB, this.frameTexture, translate(this.location[0], this.location[1], 0)); }
 
 	drawWithPicture(location, picture)
 	{
-		drawElement(Frame.frameVB, this.frameTexture, translate(location[0], location[1], 0));
 		drawElement(this.pictureVB, picture, translate(location[0], location[1], 0));
+		drawElement(this.vertexBuffer, this.texture, translate(location[0], location[1], 0));
+	}
+
+	isIn(location)
+	{
+		for(let i=0; i<4; i++)
+		{
+			let v1 = vec3(Frame.vertices[((i+1)*4)%16] - Frame.vertices[i*4], Frame.vertices[(i+1)*4%16 + 1] - Frame.vertices[i*4 + 1], 0);
+			let v2 = vec3(location[0] - Frame.vertices[(i+1)*4%16] - this.location[0], location[1] - Frame.vertices[(i+1)*4%16 + 1] - this.location[1], 0);
+			if(cross(v1, v2)[2] < 0)
+				return false;
+		}
+
+		return true;
 	}
 }
