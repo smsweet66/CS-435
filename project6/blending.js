@@ -1,10 +1,10 @@
 /**
  * Sean Sweet CS 435 Project 5
- * texmap.js is a program that creates a simple room (3 walls, a floor, a table,
- * and a tv).  Each part of the room has a different texture.  The tv can be turned on
- * to watch a video, which can be paused.  Using the previous and next buttons will
- * automatically pause the video, and will move the video to the previous or next frame
- * respectively.  The video can be resumed by clicking the pause/play button again.
+ * Blending.js is a program that displays a row of different pictures and a row of different frames.
+ * Between the two rows is a frame with a picture inside it.  Clicking any of the pictures will put that
+ * picture within the center frame, and clicking any frame, will replace the center frame with the frame
+ * that was clicked.  The picture is drawn behind the frame, but is still visible due to blending using
+ * alpha values.
  */
 
 //opengl context
@@ -45,6 +45,7 @@ window.onload = function init()
 	//sets texture uniform location
 	u_texture = gl.getUniformLocation(program, "u_texture");
 
+	//array containing the picture frames
 	let frames = [
 		new Frame([112, 212], "frame1.png", 60, 140, 150, 50),
 		new Frame([312, 212], "frame2.png", 50, 150, 175, 25),
@@ -52,6 +53,7 @@ window.onload = function init()
 		new Frame([712, 212], "frame4.png", 50, 150, 175, 25)
 	]
 
+	//array containing the pictures
 	let pictures = [
 		new Picture([112, 612], "picture1.jpg"),
 		new Picture([312, 612], "picture2.webp"),
@@ -59,8 +61,8 @@ window.onload = function init()
 		new Picture([712, 612], "picture4.jpg")
 	]
 
-	let selectedFrame = 0;
-	let selectedPicture = 0;
+	let selectedFrame = 0;      //index of selected frame
+	let selectedPicture = 0;    //index of selected picture
 
 	drawLoop();
 
@@ -72,16 +74,24 @@ window.onload = function init()
 		mouseLocation[0] = e.clientX - rect.left;
 		mouseLocation[1] = rect.bottom - e.clientY;
 
+		//check for clicked frame
 		for(let i=0; i<frames.length; i++)
 		{
 			if(frames[i].isIn(mouseLocation))
+			{
 				selectedFrame = i;
+				return;
+			}
 		}
 
+		//check for clicked picture
 		for(let i=0; i<pictures.length; i++)
 		{
 			if(pictures[i].isIn(mouseLocation))
+			{
 				selectedPicture = i;
+				return;
+			}
 		}
 	});
 
@@ -138,6 +148,7 @@ function generateTexture(image)
 	return texture;
 }
 
+//basic object class that contains vertex buffer, texture object, and location of object
 class Object
 {
 	vertexBuffer;
@@ -162,6 +173,7 @@ class Object
 	{ drawElement(this.vertexBuffer, this.texture, translate(this.location[0], this.location[1], 0)); }
 }
 
+//information for standalone picture object (not drawn in frame)
 class Picture extends Object
 {
 	static vertices = new Float32Array([
@@ -174,6 +186,7 @@ class Picture extends Object
 	constructor(location, picture)
 	{ super(location, picture, Picture.vertices); }
 
+	//checks if given x, y location is whithin frame
 	isIn(location)
 	{
 		for(let i=0; i<4; i++)
@@ -188,6 +201,7 @@ class Picture extends Object
 	}
 }
 
+//information for frame
 class Frame extends Object
 {
 	static vertices = new Float32Array([
@@ -203,6 +217,8 @@ class Frame extends Object
 	constructor(location, frame, left, right, top, bottom)
 	{
 		super(location, frame, Frame.vertices);
+
+		//constructs vertices for picture in frame
 		this.pictureVertices = new Float32Array([
 			left, bottom,   0, 0,
 			right, bottom,  1, 0,
@@ -221,6 +237,7 @@ class Frame extends Object
 		drawElement(this.vertexBuffer, this.texture, translate(location[0], location[1], 0));
 	}
 
+	//checks if given x, y location is whithin the frame
 	isIn(location)
 	{
 		for(let i=0; i<4; i++)
