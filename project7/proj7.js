@@ -1,10 +1,6 @@
 /**
- * Sean Sweet CS 435 Project 6
- * Blending.js is a program that displays a row of different pictures and a row of different frames.
- * Between the two rows is a frame with a picture inside it.  Clicking any of the pictures will put that
- * picture within the center frame, and clicking any frame, will replace the center frame with the frame
- * that was clicked.  The picture is drawn behind the frame, but is still visible due to blending using
- * alpha values.
+ * Sean Sweet CS 435 Project 7
+ *
  */
 
 //opengl context
@@ -45,7 +41,6 @@ window.onload = function init()
 	//sets texture uniform location
 	u_texture = gl.getUniformLocation(program, "u_texture");
 
-	//array containing the picture frames
 	let frames = [
 		new Frame([112, 212], "frame1.png", 60, 140, 150, 50),
 		new Frame([312, 212], "frame2.png", 50, 150, 175, 25),
@@ -53,7 +48,6 @@ window.onload = function init()
 		new Frame([712, 212], "frame4.png", 50, 150, 175, 25)
 	]
 
-	//array containing the pictures
 	let pictures = [
 		new Picture([112, 612], "picture1.jpg"),
 		new Picture([312, 612], "picture2.webp"),
@@ -61,20 +55,19 @@ window.onload = function init()
 		new Picture([712, 612], "picture4.jpg")
 	]
 
-	let selectedFrame = 0;      //index of selected frame
-	let selectedPicture = 0;    //index of selected picture
+	let selectedFrame = 0;
+	let selectedPicture = 0;
 
 	drawLoop();
 
+	const rect = canvas.getBoundingClientRect();
+	let mouseLocation = [0, 0];
 	//tells what should happen when the mouse is pressed down
 	gl.canvas.addEventListener('mousedown', (e) => {
 		//transforms raw mouse location to screen coordinates
-		const rect = canvas.getBoundingClientRect();
-		let mouseLocation = [0, 0];
 		mouseLocation[0] = e.clientX - rect.left;
 		mouseLocation[1] = rect.bottom - e.clientY;
 
-		//check for clicked frame
 		for(let i=0; i<frames.length; i++)
 		{
 			if(frames[i].isIn(mouseLocation))
@@ -84,7 +77,6 @@ window.onload = function init()
 			}
 		}
 
-		//check for clicked picture
 		for(let i=0; i<pictures.length; i++)
 		{
 			if(pictures[i].isIn(mouseLocation))
@@ -148,7 +140,47 @@ function generateTexture(image)
 	return texture;
 }
 
-//basic object class that contains vertex buffer, texture object, and location of object
+class Camera
+{
+	static location;
+	static theta;
+	static phi;
+
+	static rotate(dx, dy)
+	{
+		Camera.theta += dx;
+		Camera.phi += dy;
+
+		if(Camera.theta > 360)
+			Camera.theta -= 360;
+		else if(Camera.theta < 0)
+			Camera.theta += 360;
+
+		if(Camera.phi < -90)
+			Camera.phi = -90;
+		else if(Camera.phi > 90)
+			Camera.phi = 90;
+	}
+
+	static move(delta)
+	{
+		for(let i=0; i<3; i++)
+			Camera.location[i] += delta[i];
+	}
+
+	static getView()
+	{
+		let eye = vec3(Camera.location[0], Camera.location[1], Camera.location[2]);
+
+		let direction = vec4(1, 0, 0, 0);
+		direction = mult(rotateY(Camera.theta), direction);
+		direction = mult(rotateX(Camera.phi), direction);
+
+		let at = vec3(Camera.location[0] + direction[0], Camera.location[1] + direction[1], Camera.location[2] + direction[2]);
+		return lookAt(eye, at, vec3(0, 1, 0));
+	}
+}
+
 class Object
 {
 	vertexBuffer;
@@ -171,83 +203,4 @@ class Object
 
 	draw()
 	{ drawElement(this.vertexBuffer, this.texture, translate(this.location[0], this.location[1], 0)); }
-}
-
-//information for standalone picture object (not drawn in frame)
-class Picture extends Object
-{
-	static vertices = new Float32Array([
-		0, 0,   0, 0,
-		200, 0,  1, 0,
-		200, 200, 1, 1,
-		0, 200,  0, 1
-	]);
-
-	constructor(location, picture)
-	{ super(location, picture, Picture.vertices); }
-
-	//checks if given x, y location is whithin frame
-	isIn(location)
-	{
-		for(let i=0; i<4; i++)
-		{
-			let v1 = vec3(Picture.vertices[((i+1)*4)%16] - Picture.vertices[i*4], Picture.vertices[(i+1)*4%16 + 1] - Picture.vertices[i*4 + 1], 0);
-			let v2 = vec3(location[0] - Picture.vertices[(i+1)*4%16] - this.location[0], location[1] - Picture.vertices[(i+1)*4%16 + 1] - this.location[1], 0);
-			if(cross(v1, v2)[2] < 0)
-				return false;
-		}
-
-		return true;
-	}
-}
-
-//information for frame
-class Frame extends Object
-{
-	static vertices = new Float32Array([
-		0, 0,   0, 0,
-		200, 0,  1, 0,
-		200, 200, 1, 1,
-		0, 200,  0, 1
-	]);
-
-	pictureVertices;
-	pictureVB;
-
-	constructor(location, frame, left, right, top, bottom)
-	{
-		super(location, frame, Frame.vertices);
-
-		//constructs vertices for picture in frame
-		this.pictureVertices = new Float32Array([
-			left, bottom,   0, 0,
-			right, bottom,  1, 0,
-			right, top,     1, 1,
-			left, top,      0, 1
-		]);
-
-		this.pictureVB = gl.createBuffer();
-		gl.bindBuffer(gl.ARRAY_BUFFER, this.pictureVB);
-		gl.bufferData(gl.ARRAY_BUFFER, this.pictureVertices, gl.STATIC_DRAW);
-	}
-
-	drawWithPicture(location, picture)
-	{
-		drawElement(this.pictureVB, picture, translate(location[0], location[1], 0));
-		drawElement(this.vertexBuffer, this.texture, translate(location[0], location[1], 0));
-	}
-
-	//checks if given x, y location is whithin the frame
-	isIn(location)
-	{
-		for(let i=0; i<4; i++)
-		{
-			let v1 = vec3(Frame.vertices[((i+1)*4)%16] - Frame.vertices[i*4], Frame.vertices[(i+1)*4%16 + 1] - Frame.vertices[i*4 + 1], 0);
-			let v2 = vec3(location[0] - Frame.vertices[(i+1)*4%16] - this.location[0], location[1] - Frame.vertices[(i+1)*4%16 + 1] - this.location[1], 0);
-			if(cross(v1, v2)[2] < 0)
-				return false;
-		}
-
-		return true;
-	}
 }
