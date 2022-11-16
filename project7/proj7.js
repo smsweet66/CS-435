@@ -42,7 +42,7 @@ window.onload = function init()
 
 	//sets the perspective projection
 	u_projection = gl.getUniformLocation(program, "u_projection");
-	projectionMatrix = perspective(45, 1, 1, -1);
+	projectionMatrix = perspective(45, 1, .1, -1);
 
 	//sets texture uniform location
 	u_texture = gl.getUniformLocation(program, "u_texture");
@@ -57,33 +57,39 @@ window.onload = function init()
 		"frame1.png"
 	);
 
-	picture.addInstance([0, 0, -5]);
+	picture.addInstance([0, -.5, -5]);
 
 	window.addEventListener('keydown', (e) => {
 		switch(e.key)
 		{
+		case "w":
+			Camera.move([0, 0, -.5]);
+			break;
 		case "a":
 			 Camera.move([-.5, 0, 0]);
 			 break;
+		case "s":
+			Camera.move([0, 0, .5]);
+			break;
 		case "d":
 			Camera.move([.5, 0, 0]);
+			break;
+		case "ArrowLeft":
+			Camera.rotate(5, 0);
+			break;
+		case "ArrowRight":
+			Camera.rotate(-5, 0);
+			break;
+		case "ArrowUp":
+			Camera.rotate(0, 5);
+			break;
+		case "ArrowDown":
+			Camera.rotate(0, -5);
 			break;
 		default:
 			break;
 		}
 	});
-
-	const rect = canvas.getBoundingClientRect();
-	let mouseLocation = [0, 0];
-	let oldMouseLocation = [mouseLocation[0], mouseLocation[1]];
-
-	window.addEventListener('mousemove', (e) => {
-		mouseLocation[0] = e.clientX - rect.left;
-		mouseLocation[1] = rect.bottom - e.clientY;
-
-		Camera.rotate((oldMouseLocation[0] - mouseLocation[0])/75, (oldMouseLocation[1] - mouseLocation[1])/75);
-		oldMouseLocation = [mouseLocation[0], mouseLocation[1]];
-	})
 
 	drawLoop();
 
@@ -159,10 +165,13 @@ class Camera
 			Camera.phi = 90;
 	}
 
+	//moves the camera in relation to the direction it is currently aiming
 	static move(delta)
 	{
+		let relative = vec4(...delta, 0);
+		relative = mult(rotateY(Camera.theta), relative);
 		for(let i=0; i<3; i++)
-			Camera.location[i] += delta[i];
+			Camera.location[i] += relative[i];
 	}
 
 	static getView()
@@ -170,8 +179,8 @@ class Camera
 		let eye = vec3(Camera.location[0], Camera.location[1], Camera.location[2]);
 
 		let direction = vec4(0, 0, -1, 0);
-		direction = mult(rotateY(Camera.theta), direction);
 		direction = mult(rotateX(Camera.phi), direction);
+		direction = mult(rotateY(Camera.theta), direction);
 
 		let at = vec3(Camera.location[0] + direction[0], Camera.location[1] + direction[1], Camera.location[2] + direction[2]);
 		return lookAt(eye, at, vec3(0, 1, 0));
