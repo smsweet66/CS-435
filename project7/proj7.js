@@ -9,6 +9,9 @@ let gl;
 //model matrix uniform location
 let u_model;
 
+//view matrix uniform location
+let u_view;
+
 //projection matrix and its uniform location
 let u_projection;
 let projectionMatrix;
@@ -34,69 +37,62 @@ window.onload = function init()
 	//uniform location for model matrix (used to translate the base car location)
 	u_model = gl.getUniformLocation(program, "u_model");
 
+	//uniform location for view matrix (used for camera)
+	u_view = gl.getUniformLocation(program, "u_view");
+
 	//sets the perspective projection
 	u_projection = gl.getUniformLocation(program, "u_projection");
-	projectionMatrix = ortho(0, canvas.width, 0, canvas.height, 1, -1);
+	projectionMatrix = perspective(45, 1, 1, -1);
 
 	//sets texture uniform location
 	u_texture = gl.getUniformLocation(program, "u_texture");
 
-	let frames = [
-		new Frame([112, 212], "frame1.png", 60, 140, 150, 50),
-		new Frame([312, 212], "frame2.png", 50, 150, 175, 25),
-		new Frame([512, 212], "frame3.png", 50, 150, 175, 25),
-		new Frame([712, 212], "frame4.png", 50, 150, 175, 25)
-	]
+	let picture = new Object(
+		new Float32Array([
+			0, 0,   0, 0,
+			1, 0,  1, 0,
+			1, 1, 1, 1,
+			0, 1,  0, 1
+		]),
+		"frame1.png"
+	);
 
-	let pictures = [
-		new Picture([112, 612], "picture1.jpg"),
-		new Picture([312, 612], "picture2.webp"),
-		new Picture([512, 612], "picture3.jpg"),
-		new Picture([712, 612], "picture4.jpg")
-	]
+	picture.addInstance([0, 0, -5]);
 
-	let selectedFrame = 0;
-	let selectedPicture = 0;
-
-	drawLoop();
+	window.addEventListener('keydown', (e) => {
+		switch(e.key)
+		{
+		case "a":
+			 Camera.move([-.5, 0, 0]);
+			 break;
+		case "d":
+			Camera.move([.5, 0, 0]);
+			break;
+		default:
+			break;
+		}
+	});
 
 	const rect = canvas.getBoundingClientRect();
 	let mouseLocation = [0, 0];
-	//tells what should happen when the mouse is pressed down
-	gl.canvas.addEventListener('mousedown', (e) => {
-		//transforms raw mouse location to screen coordinates
+	let oldMouseLocation = [mouseLocation[0], mouseLocation[1]];
+
+	window.addEventListener('mousemove', (e) => {
 		mouseLocation[0] = e.clientX - rect.left;
 		mouseLocation[1] = rect.bottom - e.clientY;
 
-		for(let i=0; i<frames.length; i++)
-		{
-			if(frames[i].isIn(mouseLocation))
-			{
-				selectedFrame = i;
-				return;
-			}
-		}
+		Camera.rotate((oldMouseLocation[0] - mouseLocation[0])/75, (oldMouseLocation[1] - mouseLocation[1])/75);
+		oldMouseLocation = [mouseLocation[0], mouseLocation[1]];
+	})
 
-		for(let i=0; i<pictures.length; i++)
-		{
-			if(pictures[i].isIn(mouseLocation))
-			{
-				selectedPicture = i;
-				return;
-			}
-		}
-	});
+	drawLoop();
 
 	function drawLoop()
 	{
 		gl.clear(gl.COLOR_BUFFER_BIT);
-		for(let i=0; i<4; i++)
-		{
-			frames[i].draw();
-			pictures[i].draw();
-		}
 
-		frames[selectedFrame].drawWithPicture([412, 412], pictures[selectedPicture].texture);
+		picture.draw();
+
 		requestAnimationFrame(drawLoop);
 	}
 };
@@ -111,6 +107,7 @@ function drawElement(vertexBuffer, texture, modelMatrix)
 
 	//set uniforms
 	gl.uniformMatrix4fv(u_model, false, flatten(modelMatrix));
+	gl.uniformMatrix4fv(u_view, false, flatten(Camera.getView()));
 	gl.uniformMatrix4fv(u_projection, false, flatten(projectionMatrix));
 	gl.uniform1i(u_texture, 0);
 
@@ -142,9 +139,9 @@ function generateTexture(image)
 
 class Camera
 {
-	static location;
-	static theta;
-	static phi;
+	static location = [0, 0, 0];
+	static theta = 0;
+	static phi = 0;
 
 	static rotate(dx, dy)
 	{
@@ -172,7 +169,7 @@ class Camera
 	{
 		let eye = vec3(Camera.location[0], Camera.location[1], Camera.location[2]);
 
-		let direction = vec4(1, 0, 0, 0);
+		let direction = vec4(0, 0, -1, 0);
 		direction = mult(rotateY(Camera.theta), direction);
 		direction = mult(rotateX(Camera.phi), direction);
 
@@ -183,24 +180,28 @@ class Camera
 
 class Object
 {
+	vertices;
 	vertexBuffer;
 	texture;
 	location;
 
-	constructor(location, picture, vertices)
+	constructor(vertices, texture)
 	{
 		this.vertexBuffer = gl.createBuffer();
 		gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexBuffer);
 		gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
 
 		let image = new Image();
-		image.src = picture;
+		image.src = texture;
 		let self = this;
 		image.onload = function() { self.texture = generateTexture(image); }
 
-		this.location = location;
+		this.location = [];
 	}
 
+	addInstance(location)
+	{ this.location.push(location); }
+
 	draw()
-	{ drawElement(this.vertexBuffer, this.texture, translate(this.location[0], this.location[1], 0)); }
+	{ this.location.forEach((location) => drawElement(this.vertexBuffer, this.texture, translate(...location))); }
 }
