@@ -9,9 +9,6 @@ let gl;
 //model matrix uniform location
 let u_model;
 
-//view matrix uniform location
-let u_view;
-
 //projection matrix and its uniform location
 let u_projection;
 let projectionMatrix;
@@ -37,69 +34,27 @@ window.onload = function init()
 	//uniform location for model matrix (used to translate the base car location)
 	u_model = gl.getUniformLocation(program, "u_model");
 
-	//uniform location for view matrix (used for camera)
-	u_view = gl.getUniformLocation(program, "u_view");
-
 	//sets the perspective projection
 	u_projection = gl.getUniformLocation(program, "u_projection");
-	projectionMatrix = perspective(45, 1, .1, -1);
+	projectionMatrix = ortho(0, canvas.width, 0, canvas.height, 1, -1);
 
 	//sets texture uniform location
 	u_texture = gl.getUniformLocation(program, "u_texture");
 
-	let picture = new Object(
-		new Float32Array([
-			0, 0,   0, 0,
-			1, 0,  1, 0,
-			1, 1, 1, 1,
-			0, 1,  0, 1
-		]),
-		"frame1.png"
-	);
-
-	picture.addInstance([0, -.5, -5]);
-
-	window.addEventListener('keydown', (e) => {
-		switch(e.key)
-		{
-		case "w":
-			Camera.move([0, 0, -.5]);
-			break;
-		case "a":
-			 Camera.move([-.5, 0, 0]);
-			 break;
-		case "s":
-			Camera.move([0, 0, .5]);
-			break;
-		case "d":
-			Camera.move([.5, 0, 0]);
-			break;
-		case "ArrowLeft":
-			Camera.rotate(5, 0);
-			break;
-		case "ArrowRight":
-			Camera.rotate(-5, 0);
-			break;
-		case "ArrowUp":
-			Camera.rotate(0, 5);
-			break;
-		case "ArrowDown":
-			Camera.rotate(0, -5);
-			break;
-		default:
-			break;
-		}
-	});
+	let aliens = new AlienHorde();
 
 	drawLoop();
 
 	function drawLoop()
 	{
-		gl.clear(gl.COLOR_BUFFER_BIT);
+		new Promise(resolve => setTimeout(resolve, 500)).then(() => {
+			gl.clear(gl.COLOR_BUFFER_BIT);
 
-		picture.draw();
+			aliens.draw();
+			aliens.update();
 
-		requestAnimationFrame(drawLoop);
+			drawLoop();
+		});
 	}
 };
 
@@ -113,7 +68,6 @@ function drawElement(vertexBuffer, texture, modelMatrix)
 
 	//set uniforms
 	gl.uniformMatrix4fv(u_model, false, flatten(modelMatrix));
-	gl.uniformMatrix4fv(u_view, false, flatten(Camera.getView()));
 	gl.uniformMatrix4fv(u_projection, false, flatten(projectionMatrix));
 	gl.uniform1i(u_texture, 0);
 
@@ -143,50 +97,6 @@ function generateTexture(image)
 	return texture;
 }
 
-class Camera
-{
-	static location = [0, 0, 0];
-	static theta = 0;
-	static phi = 0;
-
-	static rotate(dx, dy)
-	{
-		Camera.theta += dx;
-		Camera.phi += dy;
-
-		if(Camera.theta > 360)
-			Camera.theta -= 360;
-		else if(Camera.theta < 0)
-			Camera.theta += 360;
-
-		if(Camera.phi < -90)
-			Camera.phi = -90;
-		else if(Camera.phi > 90)
-			Camera.phi = 90;
-	}
-
-	//moves the camera in relation to the direction it is currently aiming
-	static move(delta)
-	{
-		let relative = vec4(...delta, 0);
-		relative = mult(rotateY(Camera.theta), relative);
-		for(let i=0; i<3; i++)
-			Camera.location[i] += relative[i];
-	}
-
-	static getView()
-	{
-		let eye = vec3(Camera.location[0], Camera.location[1], Camera.location[2]);
-
-		let direction = vec4(0, 0, -1, 0);
-		direction = mult(rotateX(Camera.phi), direction);
-		direction = mult(rotateY(Camera.theta), direction);
-
-		let at = vec3(Camera.location[0] + direction[0], Camera.location[1] + direction[1], Camera.location[2] + direction[2]);
-		return lookAt(eye, at, vec3(0, 1, 0));
-	}
-}
-
 class Object
 {
 	vertices;
@@ -213,4 +123,105 @@ class Object
 
 	draw()
 	{ this.location.forEach((location) => drawElement(this.vertexBuffer, this.texture, translate(...location))); }
+}
+
+class Alien extends Object
+{
+	direction;
+
+	constructor()
+	{
+		let vertices = new Float32Array([
+			0, 0,   0, 0,
+			50, 0,  1, 0,
+			50, 50, 1, 1,
+			0, 50,  0, 1
+		]);
+
+		super(vertices, "alien.png");
+		this.direction = [];
+	}
+
+	addInstance(location, direction)
+	{
+		super.addInstance(location);
+		this.direction.push(direction);
+	}
+
+	removeInstance(i)
+	{
+		this.location.splice(i, 1);
+		this.direction.splice(i, 1);
+	}
+
+	update()
+	{
+		for(let i=0; i<this.location.length; i++)
+		{
+			if((this.location[i][0] === 50 && this.direction[i] === false) || (this.location[i][0] === 500 && this.direction[i] === true))
+			{
+				this.location[i][1] -= 50;
+				this.direction[i] = !this.direction[i];
+			}
+			else if(this.direction[i] === false)
+				this.location[i][0] -= 25;
+			else
+				this.location[i][0] += 25;
+		}
+	}
+
+	/**
+	 * Function that tells whether the alien is on the given x coordinate
+	 * @param x the x coordinate
+	 * @param i the index of the alien
+	 */
+	hit(x, i)
+	{ return (x >= this.location[i][0]) && (x <= 50 + this.location[i][0]); }
+}
+
+class AlienHorde
+{
+	aliens;
+
+	constructor()
+	{
+		this.aliens = new Alien();
+
+		let direction = false;
+		let location = [50, 500, 0];
+		for(let i=0; i<40; i++)
+		{
+			if((i+1)%10 !== 0)
+			{
+				let temp = [...location];
+				this.aliens.addInstance(temp, direction);
+			}
+
+			if((i+1)%10 === 0)
+			{
+				location[1] += 50;
+				direction = !direction;
+			}
+			else if(!direction)
+				location[0] += 50;
+			else
+				location[0] -= 50;
+		}
+
+	}
+
+	hit(x)
+	{
+		for(let i=0; i<this.aliens.location.length; i++)
+		{
+			if(this.aliens.hit(x, i))
+				this.aliens.removeInstance(i);
+		}
+	}
+
+	update()
+	{ this.aliens.update(); }
+
+	draw()
+	{ this.aliens.draw(); }
 }
