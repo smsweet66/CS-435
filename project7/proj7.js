@@ -1,6 +1,11 @@
 /**
  * Sean Sweet CS 435 Project 7
- *
+ * proj7.js is a program that creates a simple game of Space Invaders.
+ * When the player presses space, the cannon at the bottom of the screen fires at the aliens.
+ * If the left or right arrow keys are pressed, then the cannon will move left or right.
+ * Whether the player hits an alien is calculated using hit-scanning.  When all the aliens have been
+ * destroyed, a message shows up saying that you have won.  If an alien reaches the bottom, a message
+ * shows up saying that you have lost.  After both cases, the game restarts.
  */
 
 //opengl context
@@ -42,19 +47,62 @@ window.onload = function init()
 	u_texture = gl.getUniformLocation(program, "u_texture");
 
 	let aliens = new AlienHorde();
+	let player = new Player();
+
+	window.addEventListener('keydown', (e) => {
+		//player movement.
+		switch(e.key)
+		{
+		case " ":
+			aliens.hit(player.getMid());
+			drawAll();
+			//no more aliens
+			if(aliens.aliens.location.length === 0)
+			{
+				window.alert("You Win!");
+				aliens = new AlienHorde();
+			}
+			break;
+
+		case "ArrowLeft":
+			player.slide(-10);
+			drawAll();
+			break;
+
+		case "ArrowRight":
+			player.slide(10);
+			drawAll();
+			break;
+
+		default:
+			break;
+		}
+	});
 
 	drawLoop();
 
 	function drawLoop()
 	{
 		new Promise(resolve => setTimeout(resolve, 500)).then(() => {
-			gl.clear(gl.COLOR_BUFFER_BIT);
+			drawAll();
 
-			aliens.draw();
-			aliens.update();
+			//an alien reached the bottom
+			if(!aliens.update())
+			{
+				window.alert("You Lose!");
+				aliens = new AlienHorde();
+			}
 
 			drawLoop();
 		});
+	}
+
+	function drawAll()
+	{
+		gl.clear(gl.COLOR_BUFFER_BIT);
+
+		player.draw();
+		aliens.draw();
 	}
 };
 
@@ -97,6 +145,7 @@ function generateTexture(image)
 	return texture;
 }
 
+//basic object used to store information for webgl
 class Object
 {
 	vertices;
@@ -125,6 +174,7 @@ class Object
 	{ this.location.forEach((location) => drawElement(this.vertexBuffer, this.texture, translate(...location))); }
 }
 
+//information for each alien (most information is shared)
 class Alien extends Object
 {
 	direction;
@@ -142,18 +192,31 @@ class Alien extends Object
 		this.direction = [];
 	}
 
+	/**
+	 * adds location and direction to a list, creating an instance of the object
+	 * @param location  the location of the new instance
+	 * @param direction the direction the instance is moving
+	 */
 	addInstance(location, direction)
 	{
 		super.addInstance(location);
 		this.direction.push(direction);
 	}
 
+	/**
+	 * removes the ith object
+	 * @param i the index being removed.
+	 */
 	removeInstance(i)
 	{
 		this.location.splice(i, 1);
 		this.direction.splice(i, 1);
 	}
 
+	/**
+	 * moves all aliens to their next positions
+	 * @returns {boolean}   returns false if an alien reaches the bottom, true otherwise
+	 */
 	update()
 	{
 		for(let i=0; i<this.location.length; i++)
@@ -167,7 +230,12 @@ class Alien extends Object
 				this.location[i][0] -= 25;
 			else
 				this.location[i][0] += 25;
+
+			if(this.location[i][1] <= 50)
+				return false;
 		}
+
+		return true;
 	}
 
 	/**
@@ -179,6 +247,7 @@ class Alien extends Object
 	{ return (x >= this.location[i][0]) && (x <= 50 + this.location[i][0]); }
 }
 
+//class containing all information for entire group of aliens
 class AlienHorde
 {
 	aliens;
@@ -188,7 +257,7 @@ class AlienHorde
 		this.aliens = new Alien();
 
 		let direction = false;
-		let location = [50, 500, 0];
+		let location = [50, 300, 0];
 		for(let i=0; i<40; i++)
 		{
 			if((i+1)%10 !== 0)
@@ -210,18 +279,74 @@ class AlienHorde
 
 	}
 
+	/**
+	 * uses hit-scanning to test whether the shot fired by the player
+	 * will hit an alien (can only hit one per shot)
+	 * @param x the x location of the player
+	 */
 	hit(x)
 	{
 		for(let i=0; i<this.aliens.location.length; i++)
 		{
 			if(this.aliens.hit(x, i))
+			{
 				this.aliens.removeInstance(i);
+				break;
+			}
 		}
 	}
 
+	/**
+	 * updates all aliens
+	 * @returns {boolean} false if an alien reached the bottom, true otherwise
+	 */
 	update()
-	{ this.aliens.update(); }
+	{ return this.aliens.update(); }
 
+	/**
+	 * draws all aliens
+	 */
 	draw()
 	{ this.aliens.draw(); }
+}
+
+//class containing all information for the player's character
+class Player
+{
+	object;
+
+	// noinspection JSValidateTypes
+	constructor()
+	{
+		let vertices = new Float32Array([
+			0, 0,   0, 0,
+			50, 0,  1, 0,
+			50, 50, 1, 1,
+			0, 50,  0, 1
+		]);
+
+		this.object = new Object(vertices, "player.webp");
+		this.object.addInstance([275, 0, 0]);
+	}
+
+	/**
+	 * gets the center of the player
+	 * used for when the player fires a shot
+	 * @returns {number}
+	 */
+	getMid()
+	{ return this.object.location[0][0] + 25; }
+
+	/**
+	 * moves the player horizontally by the given amount
+	 * @param x the amount the player moves
+	 */
+	slide(x)
+	{ this.object.location[0][0] += x; }
+
+	/**
+	 * draws the player
+	 */
+	draw()
+	{ this.object.draw(); }
 }
